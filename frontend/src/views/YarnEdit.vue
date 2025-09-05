@@ -22,13 +22,14 @@
         <!-- Required Fields -->
         <div class="md:col-span-2">
           <label class="block text-sm font-medium mb-2">Brand *</label>
-          <input
-            v-model="form.brand"
-            type="text"
-            required
-            class="input-field w-full"
-            placeholder="e.g., Red Heart"
-          >
+          <select v-model="selectedBrand" :disabled="brandsLoading" class="input-field w-full" required>
+            <option value="" disabled>Select a brand</option>
+            <option v-for="brand in brands" :key="brand.id" :value="brand">{{ brand.name }}</option>
+            <option value="new">Add New Brand</option>
+          </select>
+          <div v-if="selectedBrand === 'new'" class="mt-2">
+            <input v-model="newBrand" type="text" required class="input-field w-full" placeholder="Enter new brand name">
+          </div>
         </div>
 
         <div class="md:col-span-2">
@@ -136,6 +137,11 @@
       <div v-if="error" class="mt-4 bg-red-900 border border-red-700 text-red-200 p-4 rounded">
         <p>{{ error }}</p>
       </div>
+
+      <!-- Fetch Error Display -->
+      <div v-if="brandsError" class="mt-4 bg-red-900 border border-red-700 text-red-200 p-4 rounded">
+        <p>{{ brandsError }}</p>
+      </div>
     </form>
   </div>
 </template>
@@ -165,6 +171,11 @@ export default {
       status: 'Full'
     })
     const submitting = ref(false)
+    const brands = ref([])
+    const selectedBrand = ref(null)
+    const newBrand = ref('')
+    const brandsLoading = ref(false)
+    const brandsError = ref('')
 
     const fetchYarn = async () => {
       const yarnId = props.id || route.params.id
@@ -196,7 +207,43 @@ export default {
       }
     }
 
+    const fetchBrands = async () => {
+      brandsLoading.value = true
+      brandsError.value = ''
+      try {
+        const response = await fetch('/api/yarn/brands')
+        if (!response.ok) throw new Error('Failed to fetch brands')
+        brands.value = await response.json()
+      } catch (err) {
+        brandsError.value = 'Failed to load brands'
+        console.error('Error fetching brands:', err)
+      } finally {
+        brandsLoading.value = false
+      }
+    }
+
     const submitForm = async () => {
+      // Brand selection validation
+      if (!selectedBrand.value) {
+        error.value = 'Please select a brand.'
+        return
+      }
+
+      if (selectedBrand.value === 'new') {
+        if (!newBrand.value.trim()) {
+          error.value = 'New brand name is required.'
+          return
+        }
+        const exists = brands.value.some(b => b.name.toLowerCase() === newBrand.value.trim().toLowerCase())
+        if (exists) {
+          error.value = 'Brand already exists'
+          return
+        }
+        form.value.brand = newBrand.value.trim()
+      } else {
+        form.value.brand = selectedBrand.value.name
+      }
+
       // Basic client-side validation
       if (!form.value.brand.trim() || !form.value.name.trim()) {
         error.value = 'Brand and name are required.'
@@ -235,7 +282,18 @@ export default {
       }
     }
 
-    onMounted(fetchYarn)
+    onMounted(async () => {
+      await Promise.all([fetchYarn(), fetchBrands()])
+      if (yarn.value && brands.value.length > 0) {
+        const foundBrand = brands.value.find(b => b.name === yarn.value.brand)
+        if (foundBrand) {
+          selectedBrand.value = foundBrand
+        } else {
+          selectedBrand.value = 'new'
+          newBrand.value = yarn.value.brand
+        }
+      }
+    })
 
     return {
       yarn,
@@ -243,6 +301,11 @@ export default {
       error,
       form,
       submitting,
+      brands,
+      selectedBrand,
+      newBrand,
+      brandsLoading,
+      brandsError,
       submitForm
     }
   }

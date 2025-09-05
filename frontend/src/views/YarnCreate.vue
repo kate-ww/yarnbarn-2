@@ -10,13 +10,14 @@
         <!-- Required Fields -->
         <div class="md:col-span-2">
           <label class="block text-sm font-medium mb-2">Brand *</label>
-          <input
-            v-model="form.brand"
-            type="text"
-            required
-            class="input-field w-full"
-            placeholder="e.g., Red Heart"
-          >
+          <select v-model="selectedBrand" :disabled="loading" class="input-field w-full" required>
+            <option value="" disabled>Select a brand</option>
+            <option v-for="brand in brands" :key="brand.id" :value="brand">{{ brand.name }}</option>
+            <option value="new">Add New Brand</option>
+          </select>
+          <div v-if="selectedBrand === 'new'" class="mt-2">
+            <input v-model="newBrand" type="text" required class="input-field w-full" placeholder="Enter new brand name">
+          </div>
         </div>
 
         <div class="md:col-span-2">
@@ -124,12 +125,17 @@
       <div v-if="error" class="mt-4 bg-red-900 border border-red-700 text-red-200 p-4 rounded">
         <p>{{ error }}</p>
       </div>
+
+      <!-- Fetch Error Display -->
+      <div v-if="fetchError" class="mt-4 bg-red-900 border border-red-700 text-red-200 p-4 rounded">
+        <p>{{ fetchError }}</p>
+      </div>
     </form>
   </div>
 </template>
 
 <script>
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 
 export default {
@@ -150,8 +156,34 @@ export default {
     })
     const submitting = ref(false)
     const error = ref('')
+    const brands = ref([])
+    const loading = ref(false)
+    const fetchError = ref('')
+    const selectedBrand = ref(null)
+    const newBrand = ref('')
 
     const submitForm = async () => {
+      // Brand selection validation
+      if (!selectedBrand.value) {
+        error.value = 'Please select a brand.'
+        return
+      }
+
+      if (selectedBrand.value === 'new') {
+        if (!newBrand.value.trim()) {
+          error.value = 'New brand name is required.'
+          return
+        }
+        const exists = brands.value.some(b => b.name.toLowerCase() === newBrand.value.trim().toLowerCase())
+        if (exists) {
+          error.value = 'Brand already exists'
+          return
+        }
+        form.value.brand = newBrand.value.trim()
+      } else {
+        form.value.brand = selectedBrand.value.name
+      }
+
       // Basic client-side validation
       if (!form.value.brand.trim() || !form.value.name.trim()) {
         error.value = 'Brand and name are required.'
@@ -190,10 +222,34 @@ export default {
       }
     }
 
+    const fetchBrands = async () => {
+      loading.value = true
+      fetchError.value = ''
+      try {
+        const response = await fetch('/api/yarn/brands')
+        if (!response.ok) throw new Error('Failed to fetch brands')
+        brands.value = await response.json()
+      } catch (err) {
+        fetchError.value = 'Failed to load brands'
+        console.error('Error fetching brands:', err)
+      } finally {
+        loading.value = false
+      }
+    }
+
+    onMounted(() => {
+      fetchBrands()
+    })
+
     return {
       form,
       submitting,
       error,
+      brands,
+      loading,
+      fetchError,
+      selectedBrand,
+      newBrand,
       submitForm
     }
   }

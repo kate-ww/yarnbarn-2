@@ -32,6 +32,17 @@ router.get('/', async (req, res) => {
   }
 });
 
+// GET /api/yarn/brands - Retrieve all active yarn brands
+router.get('/brands', async (req, res) => {
+  try {
+    const [results] = await db.execute('SELECT * FROM yarn_brands WHERE deleted = 0');
+    res.json(results);
+  } catch (err) {
+    console.error('Error fetching brands:', err);
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
 // GET /api/yarn/:id - Retrieve a single yarn record by ID
 router.get('/:id', async (req, res) => {
   try {
@@ -125,6 +136,7 @@ router.delete('/:id', async (req, res) => {
     res.status(500).json({ error: 'Database error' });
   }
 });
+
 
 // To extend: Add pagination (LIMIT/OFFSET), advanced filtering, or bulk operations
 // For security: Add authentication middleware to verify user_id matches logged-in user
