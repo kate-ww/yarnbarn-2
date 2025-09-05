@@ -68,9 +68,18 @@ router.post('/', async (req, res) => {
   try {
     const { user_id, brand, name, color, count, start_len, start_weight, curr_weight, upc, status } = req.body;
 
+    console.log('Received yarn creation request:', { user_id, brand, name, color, count, start_len, start_weight, curr_weight, upc, status });
+
     // Basic validation
     if (!user_id || !brand || !name || !start_len || !start_weight || !curr_weight) {
       return res.status(400).json({ error: 'Missing required fields' });
+    }
+
+    // Check if brand exists in yarn_brands, if not, insert it
+    const [brandCheck] = await db.execute('SELECT id FROM yarn_brands WHERE name = ? AND deleted = 0', [brand]);
+    if (brandCheck.length === 0) {
+      console.log('Inserting new brand:', brand);
+      await db.execute('INSERT INTO yarn_brands (name) VALUES (?)', [brand]);
     }
 
     const query = `INSERT INTO yarn_inventory
@@ -101,6 +110,13 @@ router.put('/:id', async (req, res) => {
     const [results] = await db.execute('SELECT * FROM yarn_inventory WHERE id = ? AND deleted = 0', [id]);
     if (results.length === 0) {
       return res.status(404).json({ error: 'Yarn not found' });
+    }
+
+    // Check if brand exists in yarn_brands, if not, insert it
+    const [brandCheck] = await db.execute('SELECT id FROM yarn_brands WHERE name = ? AND deleted = 0', [brand]);
+    if (brandCheck.length === 0) {
+      console.log('Inserting new brand:', brand);
+      await db.execute('INSERT INTO yarn_brands (name) VALUES (?)', [brand]);
     }
 
     // Update the record
